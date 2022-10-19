@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from model.unet import UNet
+from model.unet import DualViewUNet
 from data.loader import NPZData
 
 
@@ -30,20 +30,60 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
             loss, current = loss.item(), batch * len(x)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
-def test(_loader, _model, _loss_fn):
+
+def evaluate(_loader, _model, _loss_fn):
     size = len(_loader.dataset)
     num_batches = len(_loader)
     _model.eval()
     test_loss = 0
     with torch.no_grad():
-        for X, y in _loader:
-            X, y = X.to(device), y.to(device)
-            pred = _model(X)
-            test_loss += _loss_fn(pred, y).item()
-            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+        for batch, (x, P, y) in enumerate(_loader):
+            # copy to gpu
+            x, P, y = x.to(device), P.to(device), y.to(device)
+
+            # Compute prediction error
+            y_pred = _model(x, P)
+            test_loss += _loss_fn(y_pred, y).item()
+
     test_loss /= num_batches
-    correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Test Error: \n Avg loss: {test_loss:>8f}")
+
+
+def save_prediction_sample(_model, sample, fname):
+    sample = np.load(sample)
+    with torch.no_grad():
+        x = torch.as_tensor(sample['x']).to(device)
+        P = torch.as_tensor(sample['P']).to(device)
+        y_pred = _model(x, P).numpy()
+
+        # plot image
+        fig = plt.figure(figsize=(16, 8))
+        plt.subplot(241)
+        plt.imshow(sample['x'][0])
+        plt.title("x")
+        plt.subplot(245)
+        plt.imshow(sample['x'][1])
+
+        plt.subplot(242)
+        plt.imshow(sample['y'][0])
+        plt.title("y")
+        plt.subplot(236)
+        plt.imshow(sample['y'][1])
+
+        plt.subplot(243)
+        plt.imshow(y_pred[0])
+        plt.title("y_pred")
+        plt.subplot(247)
+        plt.imshow(y_pred[1])
+
+        plt.subplot(243)
+        plt.imshow(sample['y'][0] - y_pred)
+        plt.title("y - y_pred")
+        plt.subplot(248)
+        plt.imshow(sample['y'][1] - y_pred)
+
+        fig.tight_layout()
+        fig.savefig(fname)
 
 
 if __name__ == '__main__':
@@ -52,8 +92,10 @@ if __name__ == '__main__':
     bs = 16
     workers = 4
     epochs = 100
-    checkpoint_dir = ''
-    train_data_dir = Path(r'D:\datasets\2022-10-projection-domain-segmentation\simulation')
+    checkpoint_dir = Path(r'/media/dl/data2/results/fume/221019_first_training')
+    train_data_dir = Path(r'/home/dl/Documents/data/simulation')
+    example = Path(
+        r'/media/dl/dataFeb22/datasets/2022-10-projection-domain-segmentation/simulation/Spine02_0_180_id0.npz')
     ######## hyper parameters #########
 
     # 1. check GPU
@@ -61,7 +103,7 @@ if __name__ == '__main__':
     print(f"1.\tUsing {device} device {torch.cuda.get_device_name() if torch.cuda.is_available() else ''}")
 
     # 2. init model
-    m = UNet().to(device)
+    m = DualViewUNet().to(device)
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")
@@ -84,19 +126,7 @@ if __name__ == '__main__':
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
         train_one_epoch(loader, m, loss_fn, optimizer)
-        test_loss = test()
-        torch.save(m.state_dict(), checkpoint_dir / f"model_{test_loss:.2f}_{e}.pth")
+        # test_loss = evaluate(_loader=loader, _loss_fn=loss_fn, _model=m)
+        save_prediction_sample(_model=m, sample=example, fname=checkpoint_dir / f"example_{e}.png")
+        torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")
         print("Saved PyTorch Model State to model.pth")
-
-    # print(x.shape)
-    # x = x.numpy()[0]
-    # y = y.numpy()[0]
-    # plt.subplot(221)
-    # plt.imshow(x[0])
-    # plt.subplot(222)
-    # plt.imshow(x[1])
-    # plt.subplot(223)
-    # plt.imshow(y[0])
-    # plt.subplot(224)
-    # plt.imshow(y[1])
-    # plt.show()
