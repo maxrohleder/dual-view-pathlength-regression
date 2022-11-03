@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from model.unet import UNet
-# from model.dualviewunet import DualViewUNet
+from model.dualviewunet import DualViewUNet
 from data.loader import NPZData
 import argparse
 
@@ -27,7 +27,7 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
         loss.backward()
         _optimizer.step()
 
-        if batch % 100 == 0:
+        if batch % size // 10 == 0:
             loss, current = loss.item(), batch * len(x)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -108,17 +108,20 @@ if __name__ == '__main__':
     example = args.example
 
     train_data_dir = args.data
-    checkpoint_dir = args.results / 'checkpoints'
-    images_dir = args.results / 'images'
+    checkpoint_dir = Path(args.results / 'checkpoints')
+    images_dir = Path(args.results / 'images')
     ######## hyper parameters #########
+
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    images_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. check GPU
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"1.\tUsing {device} device {torch.cuda.get_device_name() if torch.cuda.is_available() else ''}")
 
     # 2. init model
-    # m = DualViewUNet().to(device)
-    m = UNet().to(device)
+    m = DualViewUNet().to(device)
+    # m = UNet().to(device)
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")

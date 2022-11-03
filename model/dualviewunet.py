@@ -57,18 +57,18 @@ class DualViewUNet(nn.Module):
 
         # Downsampling Path
         self.down_conv1 = DownBlock(1, 64)
-        self.down_conv2 = DownBlock(64, 128)
-        self.down_conv3 = DownBlock(128, 256)
-        self.down_conv4 = DownBlock(256, 512)
+        self.down_conv2 = DownBlock(64 + 64, 128)
+        self.down_conv3 = DownBlock(128 + 128, 256)
+        self.down_conv4 = DownBlock(256 + 256, 512)
 
         # Bottleneck
-        self.double_conv = DoubleConv(512, 1024)
+        self.double_conv = DoubleConv(512 + 512, 1024)
 
         # Upsampling Path
-        self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
-        self.up_conv3 = UpBlock(256 + 512, 256, self.up_sample_mode)
-        self.up_conv2 = UpBlock(128 + 256, 128, self.up_sample_mode)
-        self.up_conv1 = UpBlock(128 + 64, 64, self.up_sample_mode)
+        self.up_conv4 = UpBlock(512 + 512 + 1024, 512, self.up_sample_mode)
+        self.up_conv3 = UpBlock(256 + 256 + 512, 256, self.up_sample_mode)
+        self.up_conv2 = UpBlock(128 + 128 + 256, 128, self.up_sample_mode)
+        self.up_conv1 = UpBlock(128 + 128 + 64, 64, self.up_sample_mode)
 
         # Final Convolution
         self.conv_last = nn.Conv2d(64, out_classes, kernel_size=1)
