@@ -5,9 +5,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from model.unet import DualViewUNet
+from model.unet import UNet
+# from model.dualviewunet import DualViewUNet
 from data.loader import NPZData
-
+import argparse
 
 def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
@@ -87,15 +88,28 @@ def save_prediction_sample(_model, sample, fname):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='dual-view pathlength regression')
+    parser.add_argument('--data', action='store', type=Path, required=True)
+    parser.add_argument('--results', action='store', type=Path, required=True)
+    parser.add_argument('--example', action='store', type=Path, required=True)
+
+    parser.add_argument('--epochs', action='store', default=100, type=int, required=False)
+    parser.add_argument('--bs', action='store', default=1, type=int, required=False)
+    parser.add_argument('--lr', action='store', default=1e-3, type=int, required=False)
+    parser.add_argument('--workers', action='store', default=4, type=int, required=False)
+
+    args = parser.parse_args()
+
     ######## hyper parameters #########
-    lr = 1e-3
-    bs = 16
-    workers = 4
-    epochs = 100
-    checkpoint_dir = Path(r'/media/dl/data2/results/fume/221019_first_training')
-    train_data_dir = Path(r'/home/dl/Documents/data/simulation')
-    example = Path(
-        r'/media/dl/dataFeb22/datasets/2022-10-projection-domain-segmentation/simulation/Spine02_0_180_id0.npz')
+    lr = args.lr
+    bs = args.bs
+    workers = args.workers
+    epochs = args.epochs
+    example = args.example
+
+    train_data_dir = args.data
+    checkpoint_dir = args.results / 'checkpoints'
+    images_dir = args.results / 'images'
     ######## hyper parameters #########
 
     # 1. check GPU
@@ -103,7 +117,8 @@ if __name__ == '__main__':
     print(f"1.\tUsing {device} device {torch.cuda.get_device_name() if torch.cuda.is_available() else ''}")
 
     # 2. init model
-    m = DualViewUNet().to(device)
+    # m = DualViewUNet().to(device)
+    m = UNet().to(device)
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")
@@ -118,15 +133,16 @@ if __name__ == '__main__':
     nsamples = len(data)
     loader = DataLoader(data,
                         batch_size=bs,
-                        pin_memory=True,  # needed for CUDA multiproc
+                        pin_memory=True,  # needed for CUDA multiprocessing
                         shuffle=True,
                         num_workers=workers)
     print(f'Number of samples: {nsamples}')
 
+    # 4. train & save
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
         train_one_epoch(loader, m, loss_fn, optimizer)
         # test_loss = evaluate(_loader=loader, _loss_fn=loss_fn, _model=m)
-        save_prediction_sample(_model=m, sample=example, fname=checkpoint_dir / f"example_{e}.png")
+        save_prediction_sample(_model=m, sample=example, fname=images_dir / f"example_{e}.png")
         torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")
         print("Saved PyTorch Model State to model.pth")
