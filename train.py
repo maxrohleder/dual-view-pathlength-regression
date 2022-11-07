@@ -9,31 +9,39 @@ from model.unet import UNet
 from model.dualviewunet import DualViewUNet
 from data.loader import NPZData
 import argparse
+import torch.nn.functional as F
+
+
+def downsample(ten: torch.Tensor):
+    return F.pad(ten[:, ::2, ::2], (12, 12, 12, 12), mode="reflect")
 
 def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
+    nbatches = len(_loader)
     _model.train()
-
+    avg_loss = 0
     for batch, (x, P, y) in enumerate(_loader):
         # copy to gpu
         x, P, y = x.to(device), P.to(device), y.to(device)
 
         # Compute prediction error
-        y_pred = _model(x, P)
+        y_pred = _model(x)
         loss = _loss_fn(y_pred, y)
 
         # Backpropagation
         _optimizer.zero_grad()
         loss.backward()
         _optimizer.step()
+        avg_loss += loss.item()
 
-        if batch % size // 10 == 0:
-            loss, current = loss.item(), batch * len(x)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+        # every 10% of dataset, print info
+        if batch % (nbatches // 10) == 0:
+            current = batch * len(x)
+            print(f"avg loss: {avg_loss:>7f}  [{current:>5d}/{size:>5d}]")
+            avg_loss = 0
 
 
 def evaluate(_loader, _model, _loss_fn):
-    size = len(_loader.dataset)
     num_batches = len(_loader)
     _model.eval()
     test_loss = 0
@@ -43,22 +51,24 @@ def evaluate(_loader, _model, _loss_fn):
             x, P, y = x.to(device), P.to(device), y.to(device)
 
             # Compute prediction error
-            y_pred = _model(x, P)
+            y_pred = _model(x)
             test_loss += _loss_fn(y_pred, y).item()
 
     test_loss /= num_batches
     print(f"Test Error: \n Avg loss: {test_loss:>8f}")
+    return test_loss
 
 
-def save_prediction_sample(_model, sample, fname):
+def save_prediction_sample(_model, sample, fname, title=""):
     sample = np.load(sample)
     with torch.no_grad():
-        x = torch.as_tensor(sample['x']).to(device)
-        P = torch.as_tensor(sample['P']).to(device)
-        y_pred = _model(x, P).numpy()
+        x = torch.as_tensor(sample['x'][None, :, :, :]).to(device)
+        y_pred = _model(x).detach().cpu().numpy()[0]
 
         # plot image
         fig = plt.figure(figsize=(16, 8))
+        fig.suptitle(title)
+
         plt.subplot(241)
         plt.imshow(sample['x'][0])
         plt.title("x")
@@ -68,7 +78,7 @@ def save_prediction_sample(_model, sample, fname):
         plt.subplot(242)
         plt.imshow(sample['y'][0])
         plt.title("y")
-        plt.subplot(236)
+        plt.subplot(246)
         plt.imshow(sample['y'][1])
 
         plt.subplot(243)
@@ -77,19 +87,21 @@ def save_prediction_sample(_model, sample, fname):
         plt.subplot(247)
         plt.imshow(y_pred[1])
 
-        plt.subplot(243)
-        plt.imshow(sample['y'][0] - y_pred)
+        plt.subplot(244)
+        plt.imshow(sample['y'][0] - y_pred[0])
         plt.title("y - y_pred")
         plt.subplot(248)
-        plt.imshow(sample['y'][1] - y_pred)
+        plt.imshow(sample['y'][1] - y_pred[1])
 
         fig.tight_layout()
+        plt.show()
         fig.savefig(fname)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='dual-view pathlength regression')
     parser.add_argument('--data', action='store', type=Path, required=True)
+    parser.add_argument('--testdata', action='store', type=Path, required=True)
     parser.add_argument('--results', action='store', type=Path, required=True)
     parser.add_argument('--example', action='store', type=Path, required=True)
 
@@ -108,6 +120,7 @@ if __name__ == '__main__':
     example = args.example
 
     train_data_dir = args.data
+    test_data_dir = args.testdata
     checkpoint_dir = Path(args.results / 'checkpoints')
     images_dir = Path(args.results / 'images')
     ######## hyper parameters #########
@@ -120,8 +133,7 @@ if __name__ == '__main__':
     print(f"1.\tUsing {device} device {torch.cuda.get_device_name() if torch.cuda.is_available() else ''}")
 
     # 2. init model
-    m = DualViewUNet().to(device)
-    # m = UNet().to(device)
+    m = UNet(in_channels=2, out_channels=2).to(device)
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")
@@ -132,20 +144,28 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(m.parameters(), lr=lr)
 
     # 3. init dataloader
-    data = NPZData(train_data_dir)
-    nsamples = len(data)
-    loader = DataLoader(data,
-                        batch_size=bs,
-                        pin_memory=True,  # needed for CUDA multiprocessing
-                        shuffle=True,
-                        num_workers=workers)
-    print(f'Number of samples: {nsamples}')
+    train_data = NPZData(train_data_dir, x_transform=downsample, y_transform=downsample)
+    test_data = NPZData(test_data_dir, x_transform=downsample, y_transform=downsample)
+    nsamples = len(train_data)
+    train_loader = DataLoader(train_data,
+                              batch_size=bs,
+                              pin_memory=True,  # needed for CUDA multiprocessing
+                              shuffle=True,
+                              num_workers=workers)
+    test_loader = DataLoader(test_data,
+                             batch_size=20,
+                             pin_memory=True,  # needed for CUDA multiprocessing
+                             shuffle=True,
+                             num_workers=workers)
+    print(f'Number of train samples: {nsamples}')
 
     # 4. train & save
+    test_loss = 0.12312
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
-        train_one_epoch(loader, m, loss_fn, optimizer)
-        # test_loss = evaluate(_loader=loader, _loss_fn=loss_fn, _model=m)
-        save_prediction_sample(_model=m, sample=example, fname=images_dir / f"example_{e}.png")
+        save_prediction_sample(_model=m, sample=example, fname=images_dir / f"example_{e}.png", title=f"epoch {e}, test loss {test_loss:.2f}")
+        exit()
+        train_one_epoch(train_loader, m, loss_fn, optimizer)
+        test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
         torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")
-        print("Saved PyTorch Model State to model.pth")
+        print(f"Saved Model State to {checkpoint_dir / f'model_{e}.pth'}")

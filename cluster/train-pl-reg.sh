@@ -27,7 +27,7 @@ LR=0.001
 WORKERS=4
 
 # load and init conda if it doesnt exist
-if ! command -v <conda> &> /dev/null 
+if ! command -v conda &> /dev/null
 then
 	echo "load conda from module"
 	module load python/3.8-anaconda
@@ -49,7 +49,7 @@ echo "finished transfer at $(date)"
 
 # start training
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
-python train.py --data $FAST_DATA_DIR --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
+python train.py --data $FAST_DATA_DIR/train --testdata $FAST_DATA_DIR/test --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
 rm -rf $FAST_DATA_DIR
