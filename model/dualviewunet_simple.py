@@ -49,29 +49,34 @@ class UpBlock(nn.Module):
         return self.double_conv(x)
 
 
-class DualViewUNet(nn.Module):
-    def __init__(self, out_classes=1, up_sample_mode='conv_transpose'):
-        super(DualViewUNet, self).__init__()
+class UNetDualDecoder(nn.Module):
+    def __init__(self, up_sample_mode='conv_transpose'):
+        super(UNetDualDecoder, self).__init__()
         self.up_sample_mode = up_sample_mode
         self.fume = Fume3dLayer()
+        self.f2 = torch.ones(view1.size(0), dtype=view1.dtype, device='cuda', requires_grad=False)
 
         # Downsampling Path
         self.down_conv1 = DownBlock(1, 64)
-        self.down_conv2 = DownBlock(64 + 64, 128)
-        self.down_conv3 = DownBlock(128 + 128, 256)
-        self.down_conv4 = DownBlock(256 + 256, 512)
+        self.down_conv2 = DownBlock(64, 128)
+        self.down_conv3 = DownBlock(128, 256)
+        self.down_conv4 = DownBlock(256, 512)
 
         # Bottleneck
-        self.double_conv = DoubleConv(512 + 512, 1024)
+        self.double_conv = DoubleConv(512, 1024)
 
         # Upsampling Path
-        self.up_conv4 = UpBlock(512 + 512 + 1024, 512, self.up_sample_mode)
-        self.up_conv3 = UpBlock(256 + 256 + 512, 256, self.up_sample_mode)
-        self.up_conv2 = UpBlock(128 + 128 + 256, 128, self.up_sample_mode)
-        self.up_conv1 = UpBlock(128 + 128 + 64, 64, self.up_sample_mode)
+        self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
+        self.up_conv3 = UpBlock(256 + 512 + 512, 256, self.up_sample_mode)
+        self.up_conv2 = UpBlock(128 + 256 + 256, 128, self.up_sample_mode)
+        self.up_conv1 = UpBlock(128 + 128 + 128, 64, self.up_sample_mode)
 
         # Final Convolution
-        self.conv_last = nn.Conv2d(64, out_classes, kernel_size=1)
+        self.conv_last = nn.Sequential(
+            nn.Conv2d(64, 1, kernel_size=1),
+            nn.BatchNorm2d(1),
+            nn.ReLU(inplace=True)
+        )
 
     def forward(self, x: torch.Tensor, P: torch.Tensor):
         """
@@ -91,74 +96,48 @@ class DualViewUNet(nn.Module):
 
         # down block level 1
         view1, view1_skip1 = self.down_conv1(view1)
-        CM2 = self.fume(view1, F21, F12)
         view2, view2_skip1 = self.down_conv1(view2)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = torch.cat([view1, CM1], dim=1)
-        view2 = torch.cat([view2, CM2], dim=1)
 
         # down block level 2
         view1, view1_skip2 = self.down_conv2(view1)
-        CM2 = self.fume(view1, F21, F12)
         view2, view2_skip2 = self.down_conv2(view2)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = torch.cat([view1, CM1], dim=1)
-        view2 = torch.cat([view2, CM2], dim=1)
 
         # down block level 3
         view1, view1_skip3 = self.down_conv3(view1)
-        CM2 = self.fume(view1, F21, F12)
         view2, view2_skip3 = self.down_conv3(view2)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = torch.cat([view1, CM1], dim=1)
-        view2 = torch.cat([view2, CM2], dim=1)
 
         # down block level 4
         view1, view1_skip4 = self.down_conv4(view1)
-        CM2 = self.fume(view1, F21, F12)
         view2, view2_skip4 = self.down_conv4(view2)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = torch.cat([view1, CM1], dim=1)
-        view2 = torch.cat([view2, CM2], dim=1)
 
         # bottleneck
         view1 = self.double_conv(view1)
         view2 = self.double_conv(view2)
 
         # up block level 4
-        CM2_skip4 = self.fume(view1_skip4, F21, F12)
-        CM1_skip4 = self.fume(view2_skip4, F12, F21)
-        view1_skip4 = torch.cat([view1_skip4, CM1_skip4], dim=1)
-        view2_skip4 = torch.cat([view2_skip4, CM2_skip4], dim=1)
-        view1 = self.up_conv4(view1, view1_skip4)
+        view1 = self.up_conv4(view1, view1_skip4)  # 512, 1024
         view2 = self.up_conv4(view2, view2_skip4)
 
         # up block level 3
-        CM2_skip3 = self.fume(view1_skip3, F21, F12)
-        CM1_skip3 = self.fume(view2_skip3, F12, F21)
-        view1_skip3 = torch.cat([view1_skip3, CM1_skip3], dim=1)
-        view2_skip3 = torch.cat([view2_skip3, CM2_skip3], dim=1)
-        view1 = self.up_conv4(view1, view1_skip3)
-        view2 = self.up_conv4(view2, view2_skip3)
+        CM2 = self.fume(view1, F21, F12, downsampled_factor=2)
+        CM1 = self.fume(view2, F12, F21)
+        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip3)  # 512, 512, 265
+        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip3)
 
         # up block level 2
-        CM2_skip2 = self.fume(view1_skip2, F21, F12)
-        CM1_skip2 = self.fume(view2_skip2, F12, F21)
-        view1_skip2 = torch.cat([view1_skip2, CM1_skip2])
-        view2_skip2 = torch.cat([view2_skip2, CM2_skip2])
-        view1 = self.up_conv4(view1, view1_skip2)
-        view2 = self.up_conv4(view2, view2_skip2)
+        CM2 = self.fume(view1, F21, F12)
+        CM1 = self.fume(view2, F12, F21)
+        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip2)  # 265, 265, 128
+        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip2)
 
         # up block level 1
-        CM2_skip1 = self.fume(view1_skip1, F21, F12)
-        CM1_skip1 = self.fume(view2_skip1, F12, F21)
-        view1_skip1 = torch.cat([view1_skip1, CM1_skip1])
-        view2_skip1 = torch.cat([view2_skip1, CM2_skip1])
-        view1 = self.up_conv4(view1, view1_skip1)
-        view2 = self.up_conv4(view2, view2_skip1)
+        CM2 = self.fume(view1, F21, F12)
+        CM1 = self.fume(view2, F12, F21)
+        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip1)  # 128, 128, 64
+        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip1)
 
         # last conv
-        view1 = self.conv_last(view1)
+        view1 = self.conv_last(view1)  # 64
         view2 = self.conv_last(view2)
 
         # recombine views into channels
