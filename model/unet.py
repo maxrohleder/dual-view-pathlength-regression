@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from pytorch_memlab import profile
+
 
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -48,11 +50,11 @@ class UpBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, out_classes=2, up_sample_mode='conv_transpose'):
+    def __init__(self, in_channels, out_channels, up_sample_mode='conv_transpose'):
         super(UNet, self).__init__()
         self.up_sample_mode = up_sample_mode
         # Downsampling Path
-        self.down_conv1 = DownBlock(1, 64)
+        self.down_conv1 = DownBlock(in_channels, 64)
         self.down_conv2 = DownBlock(64, 128)
         self.down_conv3 = DownBlock(128, 256)
         self.down_conv4 = DownBlock(256, 512)
@@ -67,7 +69,11 @@ class UNet(nn.Module):
         self.up_conv1 = UpBlock(128 + 64, 64, self.up_sample_mode)
 
         # Final Convolution
-        self.conv_last = nn.Conv2d(64, out_classes, kernel_size=1)
+        self.conv_last = nn.Sequential(
+            nn.Conv2d(64, out_channels, kernel_size=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
 
     def forward(self, x):
         x, skip1_out = self.down_conv1(x)
