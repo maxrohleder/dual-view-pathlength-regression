@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from fume import Fume3dLayer
+from pytorch_memlab import profile
 
 
 class DoubleConv(nn.Module):
@@ -54,7 +55,9 @@ class UNetDualDecoder(nn.Module):
         super(UNetDualDecoder, self).__init__()
         self.up_sample_mode = up_sample_mode
         self.fume = Fume3dLayer()
-        self.f2 = torch.ones(view1.size(0), dtype=view1.dtype, device='cuda', requires_grad=False)
+        self.f2 = torch.tensor(2, dtype=torch.float32, device='cuda', requires_grad=False)
+        self.f4 = torch.tensor(4, dtype=torch.float32, device='cuda', requires_grad=False)
+        self.f8 = torch.tensor(8, dtype=torch.float32, device='cuda', requires_grad=False)
 
         # Downsampling Path
         self.down_conv1 = DownBlock(1, 64)
@@ -69,7 +72,7 @@ class UNetDualDecoder(nn.Module):
         self.up_conv4 = UpBlock(512 + 1024, 512, self.up_sample_mode)
         self.up_conv3 = UpBlock(256 + 512 + 512, 256, self.up_sample_mode)
         self.up_conv2 = UpBlock(128 + 256 + 256, 128, self.up_sample_mode)
-        self.up_conv1 = UpBlock(128 + 128 + 128, 64, self.up_sample_mode)
+        self.up_conv1 = UpBlock(64 + 128 + 128, 64, self.up_sample_mode)
 
         # Final Convolution
         self.conv_last = nn.Sequential(
@@ -78,6 +81,10 @@ class UNetDualDecoder(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+        # debug
+        self.down_sample = nn.MaxPool2d(2)
+        self.up_sample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
     def forward(self, x: torch.Tensor, P: torch.Tensor):
         """
         jointly segment two views of 3d scene
@@ -85,7 +92,6 @@ class UNetDualDecoder(nn.Module):
         :param P: expected shape is (b, 2, 3, 3)
         :return: tensor in shape (b, 2, 976, 976)
         """
-
         # split views stored in input image channels
         view1 = x.select(1, 0).unsqueeze(1)  # (dim, index)
         view2 = x.select(1, 1).unsqueeze(1)
@@ -119,22 +125,23 @@ class UNetDualDecoder(nn.Module):
         view2 = self.up_conv4(view2, view2_skip4)
 
         # up block level 3
-        CM2 = self.fume(view1, F21, F12, downsampled_factor=2)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip3)  # 512, 512, 265
-        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip3)
+        CM2 = self.fume(view1, F21, F12, downsampled_factor=self.f8.expand(view1.shape[0]))
+        CM1 = self.fume(view2, F12, F21, downsampled_factor=self.f8.expand(view1.shape[0]))
+        view1 = self.up_conv3(torch.cat([view1, CM1], dim=1), view1_skip3)  # 512, 512, 265
+        view2 = self.up_conv3(torch.cat([view2, CM2], dim=1), view2_skip3)
 
         # up block level 2
-        CM2 = self.fume(view1, F21, F12)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip2)  # 265, 265, 128
-        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip2)
+        CM2 = self.fume(view1, F21, F12, downsampled_factor=self.f4.expand(view1.shape[0]))
+        CM1 = self.fume(view2, F12, F21, downsampled_factor=self.f4.expand(view1.shape[0]))
+        view1 = self.up_conv2(torch.cat([view1, CM1], dim=1), view1_skip2)  # 265, 265, 128
+        view2 = self.up_conv2(torch.cat([view2, CM2], dim=1), view2_skip2)
 
         # up block level 1
-        CM2 = self.fume(view1, F21, F12)
-        CM1 = self.fume(view2, F12, F21)
-        view1 = self.up_conv4(torch.cat([view1, CM1], dim=1), view1_skip1)  # 128, 128, 64
-        view2 = self.up_conv4(torch.cat([view2, CM2], dim=1), view2_skip1)
+        assert view1.shape == (1, 128, 256, 256), view1.shape
+        CM2 = self.fume(view1, F21, F12, downsampled_factor=self.f2.expand(view1.shape[0]))
+        CM1 = self.fume(view2, F12, F21, downsampled_factor=self.f2.expand(view1.shape[0]))
+        view1 = self.up_conv1(torch.cat([view1, CM1], dim=1), view1_skip1)  # 128, 128, 64
+        view2 = self.up_conv1(torch.cat([view2, CM2], dim=1), view2_skip1)
 
         # last conv
         view1 = self.conv_last(view1)  # 64
@@ -142,4 +149,26 @@ class UNetDualDecoder(nn.Module):
 
         # recombine views into channels
         x = torch.cat([view1, view2], dim=1)
+
+
+        # # DEBUG
+        # view1debug = x.select(1, 0).unsqueeze(1)
+        # view2debug = x.select(1, 1).unsqueeze(1)
+        #
+        # # select respective fundamental matrices P = [F12, F21]
+        # F12 = P.select(1, 0).contiguous()
+        # F21 = P.select(1, 1).contiguous()
+        #
+        # view1debug = self.down_sample(view1debug)
+        # view2debug = self.down_sample(view2debug)
+        #
+        # CM2 = self.fume(view1debug, F21, F12, downsampled_factor=self.f2.expand(view1debug.shape[0]))
+        # CM1 = self.fume(view2debug, F12, F21, downsampled_factor=self.f2.expand(view1debug.shape[0]))
+        #
+        # CM1 = self.up_sample(CM1)
+        # CM2 = self.up_sample(CM2)
+        #
+        # # recombine views into channels
+        # x = torch.cat([CM1, CM2], dim=1)
+        # print(x.shape)
         return x

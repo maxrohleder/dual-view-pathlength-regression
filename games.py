@@ -34,18 +34,21 @@ if __name__ == '__main__':
         y_pred = y_pred.detach().cpu().numpy().squeeze()
 
         plt.figure(figsize=(8, 4))
-        plt.subplot(121)
-        plt.suptitle(f"{i}")
-        plt.imshow(y.cpu().numpy()[0, 0].T, cmap="Greys")
-        plt.imshow(y_pred[0].T, alpha=0.5, cmap="Greens")
 
-        plt.subplot(122)
+        plt.subplot(121)
         plt.imshow(y.cpu().numpy()[0, 1].T, cmap="Greys")
         plt.imshow(y_pred[1].T, alpha=0.5, cmap="Greens")
+
+        plt.subplot(122)
+        plt.imshow(y.cpu().numpy()[0, 0].T, cmap="Greys")
+        plt.imshow(y_pred[0].T, alpha=0.5, cmap="Greens")
+        plt.suptitle(f"{i}")
         plt.tight_layout()
 
         plt.show()
-        base = r"/home/dl/Documents/results/FUME/FUME_on_6_screws_example/examples/"
+        base = r"./"  # adapt this to your needs
+        imsave(base + r"CM1.tif", y_pred[0].T)
+        imsave(base + r"view1.tif", y.cpu().numpy()[0, 0].T)
         imsave(base + r"CM2.tif", y_pred[1].T)
         imsave(base + r"view2.tif", y.cpu().numpy()[0, 1].T)
         input(f"{i}, next?")
