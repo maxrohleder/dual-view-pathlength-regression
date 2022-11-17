@@ -137,7 +137,6 @@ class UNetDualDecoder(nn.Module):
         view2 = self.up_conv2(torch.cat([view2, CM2], dim=1), view2_skip2)
 
         # up block level 1
-        assert view1.shape == (1, 128, 256, 256), view1.shape
         CM2 = self.fume(view1, F21, F12, downsampled_factor=self.f2.expand(view1.shape[0]))
         CM1 = self.fume(view2, F12, F21, downsampled_factor=self.f2.expand(view1.shape[0]))
         view1 = self.up_conv1(torch.cat([view1, CM1], dim=1), view1_skip1)  # 128, 128, 64
