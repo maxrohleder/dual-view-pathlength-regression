@@ -3,12 +3,39 @@ import numpy as np
 from fume import calculate_fundamental_matrix
 from torch.utils.data import Dataset
 import torch
+from torchvision.transforms import Normalize
+from scipy.signal import convolve2d
+
+# A. S. Wang et al., “Low-dose preview for patient-specific, task-specific technique selection in cone-beam CT,
+# ” Med Phys, vol. 41, no. 7, Jul. 2014.
+kernel_shot_noise = np.array([[0.03, 0.06, 0.02],
+                              [0.11, 0.98, 0.11],
+                              [0.02, 0.06, 0.03]])
+
+
+def add_noise(proj_stack, photon_num=None):
+    """photon number usually in [10e1, 10e3]"""
+    output = proj_stack.copy()
+    photon_number = np.random.randint(10e1, 10e3) if photon_num is None else photon_num  # the higher the less noisy
+
+    # apply shot noise as in deepdrr
+    for i, p in enumerate(proj_stack):
+        lamb = p * photon_number  # lambda parameter for poisson dist
+        shot_noise = ((np.random.poisson(lamb) - lamb) / lamb) * p
+        output[i] += convolve2d(shot_noise, kernel_shot_noise, mode="same")
+
+    return output
 
 def downsample_tensor(ten: torch.Tensor, d, p):
     return torch.nn.functional.pad(ten[:, ::d, ::d], (p, p, p, p), mode="constant")
 
+
+def neglog(intensities):
+    return -np.log(np.maximum(intensities, np.finfo(dtype=intensities.dtype).eps))
+
+
 class NPZData(Dataset):
-    def __init__(self, path, downsample=1, pad=0):
+    def __init__(self, path, downsample=1, pad=0, normalize=True, neglog=False):
         self.path = path
         self.files = sorted(list(Path(path).glob('*.npz')))
         self.downsample, self.pad = downsample, pad
@@ -27,9 +54,16 @@ class NPZData(Dataset):
 
     def __getitem__(self, item):
         sample = np.load(str(self.files[item]))
+
+        # adding noise
+        x = add_noise(sample['x'])
+
         # images need to be transposed for fume layers
-        x_tensor = torch.from_numpy(np.transpose(sample['x'], axes=(0, 2, 1)))
+        x_tensor = torch.from_numpy(np.transpose(x, axes=(0, 2, 1)))
         y_tensor = torch.from_numpy(np.transpose(sample['y'], axes=(0, 2, 1)))
+
+        # normalize
+        x_tensor = Normalize(torch.mean(x_tensor, dim=(1, 2)), torch.std(x_tensor, dim=(1, 2)), inplace=True)(x_tensor)
 
         # downsample and augment etc.
         if self.downsample != 1 or self.pad != 0:
