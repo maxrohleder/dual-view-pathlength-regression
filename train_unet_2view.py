@@ -14,9 +14,9 @@ import torch.nn.functional as F
 
 
 def downsample(ten: torch.Tensor):
-    return F.pad(ten[:, ::2, ::2], (12, 12, 12, 12), mode="reflect")
+    return F.pad(ten[:, ::2, ::2], (12, 12, 12, 12), mode="zeros")  # (2, 976, 976)  --> (2, 512, 512)
 
-@profile
+
 def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
     nbatches = len(_loader)
@@ -39,7 +39,7 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
         # every 10% of dataset, print info
         if batch % (nbatches // 10) == 0:
             current = batch * len(x)
-            print(f"avg loss: {avg_loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"avg loss: {avg_loss:>7f}  [{current:>5d} /{size:>5d} ]")
             avg_loss = 0
 
 
@@ -96,8 +96,8 @@ def save_prediction_sample(_model, sample, fname, title=""):
         plt.imshow(sample['y'][1] - y_pred[1])
 
         fig.tight_layout()
-        plt.show()
         fig.savefig(fname)
+        plt.close(fig)
 
 
 if __name__ == '__main__':
@@ -146,8 +146,8 @@ if __name__ == '__main__':
     optimizer = torch.optim.Adam(m.parameters(), lr=lr)
 
     # 3. init dataloader
-    train_data = NPZData(train_data_dir, x_transform=downsample, y_transform=downsample)
-    test_data = NPZData(test_data_dir, x_transform=downsample, y_transform=downsample)
+    train_data = NPZData(train_data_dir, downsample=2, pad=12)
+    test_data = NPZData(test_data_dir, downsample=2, pad=12)
     nsamples = len(train_data)
     train_loader = DataLoader(train_data,
                               batch_size=bs,
@@ -155,14 +155,14 @@ if __name__ == '__main__':
                               shuffle=True,
                               num_workers=workers)
     test_loader = DataLoader(test_data,
-                             batch_size=20,
+                             batch_size=bs,
                              pin_memory=True,  # needed for CUDA multiprocessing
-                             shuffle=True,
+                             shuffle=False,
                              num_workers=workers)
     print(f'Number of train samples: {nsamples}')
 
     # 4. train & save
-    test_loss = 0.12312
+    test_loss = -1.00
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
         save_prediction_sample(_model=m, sample=example, fname=images_dir / f"example_{e}.png", title=f"epoch {e}, test loss {test_loss:.2f}")

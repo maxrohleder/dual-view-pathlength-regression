@@ -26,6 +26,10 @@ BS=4
 LR=0.001
 WORKERS=4
 
+# allows for internet connection on cluster nodes
+export http_proxy=http://proxy:80
+export https_proxy=http://proxy:80
+
 # load and init conda if it doesnt exist
 if ! command -v conda &> /dev/null
 then

@@ -1,7 +1,9 @@
+import time
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from pathlib import Path
 
 import numpy as np
+import tqdm
 from tifffile import imread
 
 from data.utils import spin_matrices_from_xml
@@ -14,7 +16,7 @@ Expecting a folder structure as argument <src> like this:
 
 <src>
 ├───SampleName01
-│   ├───<Filename01>.tiff           <-- make sure <Filename01> does not include an underscore '_'
+│   ├───<Filename01>.tiff
 │   ├───<Filename01>_2Dmask.tiff
 │   └───<Filename01>.xml
 ├───SampleName02
@@ -54,34 +56,46 @@ args = parser.parse_args()
 src = Path(args.src)
 dst = Path(args.dst)
 
-# 1. select all directories
+# select all directories
 samplepaths = [f for f in src.iterdir() if f.is_dir()]
-skipped, processed = 0, 0
-sid = 0
+
+# init counters, progressbar
+skipped, processed, sid = 0, 0, 0
+pbar = tqdm.tqdm(total=len(samplepaths), desc="resampling dataset")
 
 for spath in samplepaths:
     # 2. read images, ground truth and projection matrices
     try:
-        fname = ''
-        print(spath)
-        for f in spath.iterdir():
-            tmp = f.stem.split('_')[0]
-            assert fname == tmp or fname == '', f'there is a non-matching file in {spath}. skipping...'
-            fname = tmp
-        matrices = spin_matrices_from_xml(spath / (fname + '.xml'))
-        assert matrices.shape[0] == 400
-        image = imread(spath / (fname + '.tiff'))
-        gt2d = imread(spath / (fname + '_2Dmask.tiff'))
-        assert matrices.shape[0] == image.shape[0] == gt2d.shape[0] == 400, 'sample doesnt have 400 images'
+        pbar.update(1)
+        pbar.set_description(f"processing {spath.name}")
 
-        for i in range(matrices.shape[0] - 180):
-            np.savez(
-                dst / (spath.stem + "_" + str(i) + "_" + str(i + 180) + f"_id{sid}"),
-                x=np.array([image[i], image[i + 180]]),
-                y=np.array([gt2d[i], gt2d[i + 180]]),
-                P=np.array([matrices[i], matrices[i + 180]])
-            )
+        # these two conventions are to be met
+        matrices_path = [f.absolute() for f in spath.iterdir() if f.suffix == ".xml"]
+        gt2d_path = [f.absolute() for f in spath.iterdir() if f.name.endswith("_2Dmask.tiff")]
+
+        # derive image name from 2D mask
+        assert len(gt2d_path) == 1 and len(matrices_path) == 1, f"more than one 2Dmask found.. {spath}"
+        gt2d_path, matrices_path = gt2d_path[0], matrices_path[0]
+        image_path = gt2d_path.parent / (gt2d_path.stem[:-7] + ".tiff")
+        assert image_path.exists() and gt2d_path.exists(), f"No such file {image_path}, {gt2d_path}"
+
+        # load data
+        if not args.dry:
+            matrices = spin_matrices_from_xml(matrices_path)
+            image, gt2d = imread(image_path), imread(gt2d_path)
+            assert matrices.shape[0] == image.shape[0] == gt2d.shape[0] == 400, 'sample doesnt have 400 images'
+
+        # resample in sets of 2 at 5 degrees angular increment
+        for i in range(0, 400 - 180, 4):
+            if not args.dry:
+                np.savez(
+                    dst / (spath.stem + "_" + str(i) + "_" + str(i + 180) + f"_id{sid}"),
+                    x=np.array([image[i], image[i + 180]]),
+                    y=np.array([gt2d[i], gt2d[i + 180]]),
+                    P=np.array([matrices[i], matrices[i + 180]])
+                )
             sid += 1
+        processed += 1
 
     except AssertionError as e:
         print(e)
@@ -91,7 +105,7 @@ for spath in samplepaths:
         print(e)
         skipped += 1
 
-    print(f'Done. Overview:'
-          f'\n\t- processed sucessfully: {processed}'
-          f'\n\t- skipped files: {skipped}'
-          f'\n\t- written training pairs: {sid}')
+print(f'Done. Overview:'
+      f'\n\t- processed sucessfully: {processed}'
+      f'\n\t- skipped files: {skipped}'
+      f'\n\t- written training pairs: {sid}')
