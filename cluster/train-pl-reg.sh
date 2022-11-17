@@ -13,7 +13,7 @@
 
 ############    paths    ###############
 
-DATA_DIR=$HPCVAULT/pl-reg
+DATA_DIR=$HPCVAULT/datadump
 FAST_DATA_DIR=$TMPDIR/pl-reg-data-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
 RESULTS_DIR=$HOME/pl-reg-run-$SLURM_JOB_ID
@@ -39,6 +39,7 @@ then
 fi
 
 # activate conda env
+conda init bash
 conda activate "$HOME/conda/fume"
 echo "using python $(which python)"
 
@@ -53,7 +54,7 @@ echo "finished transfer at $(date)"
 
 # start training
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
-python train.py --data $FAST_DATA_DIR/train --testdata $FAST_DATA_DIR/test --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
+python train_dual_unet.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
 rm -rf $FAST_DATA_DIR

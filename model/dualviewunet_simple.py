@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from fume import Fume3dLayer
-from pytorch_memlab import profile
 
 
 class DoubleConv(nn.Module):

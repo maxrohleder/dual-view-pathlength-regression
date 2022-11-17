@@ -5,11 +5,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from model.unet import UNet
 from model.dualviewunet_simple import UNetDualDecoder
 from data.loader import NPZData
 import argparse
-from pytorch_memlab import profile
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
