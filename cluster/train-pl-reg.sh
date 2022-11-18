@@ -13,7 +13,8 @@
 
 ############    paths    ###############
 
-DATA_DIR=$HPCVAULT/datadump
+#DATA_DIR=$HPCVAULT/datadump
+DATA_ARCHIVE=$HPCVAULT/pl-reg/archive.tar
 FAST_DATA_DIR=$TMPDIR/pl-reg-data-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
 RESULTS_DIR=$HOME/pl-reg-run-$SLURM_JOB_ID
@@ -39,7 +40,6 @@ then
 fi
 
 # activate conda env
-conda init bash
 conda activate "$HOME/conda/fume"
 echo "using python $(which python)"
 
@@ -49,7 +49,8 @@ echo "python reaches gpu: $(python -c 'import torch;print(torch.cuda.is_availabl
 
 # copy training data to faster drive
 echo "started data transfer at $(date)"
-rsync -aq $DATA_DIR/* $FAST_DATA_DIR
+#rsync -aq $DATA_DIR/* $FAST_DATA_DIR
+tar -xf $DATA_ARCHIVE -C $FAST_DATA_DIR
 echo "finished transfer at $(date)"
 
 # start training

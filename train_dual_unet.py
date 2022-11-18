@@ -98,7 +98,7 @@ def save_prediction_sample(y_pred, y, x):
     plt.imshow(y[1].T - y_pred[1].T)
 
     fig.tight_layout()
-    plt.show()
+    #plt.show()
     fig.savefig(images_dir / f"example_{e}.png")
     writer.add_figure("example", fig, global_step=e*niter, close=True)
 
