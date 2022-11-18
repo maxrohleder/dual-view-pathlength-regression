@@ -5,11 +5,11 @@
 ############    slurm    ###############
 
 #SBATCH --job-name=dual-view-pl-reg
-#SBATCH --time=24:00:00
+#SBATCH --time=00:30:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
-#SBATCH -o /$HOME/%x-%j-on-%N.out
-#SBATCH -e /$HOME/%x-%j-on-%N.err
+#SBATCH -o $HOME/%x-%j-on-%N.out
+#SBATCH -e $HOME/%x-%j-on-%N.err
 
 ############    paths    ###############
 
@@ -50,6 +50,7 @@ echo "python reaches gpu: $(python -c 'import torch;print(torch.cuda.is_availabl
 # copy training data to faster drive
 echo "started data transfer at $(date)"
 #rsync -aq $DATA_DIR/* $FAST_DATA_DIR
+mkdir $FAST_DATA_DIR
 tar -xf $DATA_ARCHIVE -C $FAST_DATA_DIR
 echo "finished transfer at $(date)"
 
