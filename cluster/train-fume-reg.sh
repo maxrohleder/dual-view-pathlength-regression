@@ -4,7 +4,7 @@
 
 ############    slurm    ###############
 
-#SBATCH --job-name=pl-reg
+#SBATCH --job-name=fume-reg
 #SBATCH --time=24:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
@@ -15,7 +15,7 @@
 DATA_ARCHIVE=$HPCVAULT/pl-reg/archive.tar
 FAST_DATA_DIR=$TMPDIR/pl-reg-data-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
-RESULTS_DIR=$HOME/pl-reg-run-$SLURM_JOB_ID
+RESULTS_DIR=$HOME/fume-reg-$SLURM_JOB_ID
 EXAMPLE=$DATA_DIR/Spine02_0_180_id0.npz
 
 ############    params   ###############

@@ -2,7 +2,7 @@
 
 ############    slurm    ###############
 
-#SBATCH --job-name=dual-view-seg
+#SBATCH --job-name=dual-reg
 #SBATCH --time=24:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
@@ -10,9 +10,9 @@
 ############    paths    ###############
 
 DATA_ARCHIVE=$HPCVAULT/pl-reg/archive.tar
-FAST_DATA_DIR=$TMPDIR/fume-seg-$SLURM_JOB_ID
+FAST_DATA_DIR=$TMPDIR/dual-view-reg-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
-RESULTS_DIR=$HOME/fume-seg-$SLURM_JOB_ID
+RESULTS_DIR=$HOME/dual-view-reg-$SLURM_JOB_ID
 
 ############    params   ###############
 
