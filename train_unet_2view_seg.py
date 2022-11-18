@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from model.dualviewunet_simple import UNetDualDecoder
+from model.unet import UNet
 from data.loader import NPZData
 import argparse
 import torch.nn.functional as F
@@ -35,12 +35,12 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     nbatches = len(_loader)
     _model.train()
     avg_loss = 0
-    for batch, (x, P, y) in enumerate(_loader):
+    for batch, (x, _, y) in enumerate(_loader):
         # copy to gpu
-        x, P, y = x.cuda(), P.cuda(), y.cuda()
+        x, y = x.cuda(), y.cuda()
 
         # Compute prediction error
-        y_pred = _model(x, P)
+        y_pred = _model(x)
         loss = _loss_fn(y_pred, y)
 
         # Backpropagation
@@ -64,12 +64,12 @@ def evaluate(_loader, _model, _loss_fn):
     test_loss = 0
     print(f"{datetime.now()}:   evaluation...")
     with torch.no_grad():
-        for batch, (x, P, y) in enumerate(_loader):
+        for batch, (x, _, y) in enumerate(_loader):
             # copy to gpu
-            x, P, y = x.cuda(), P.cuda(), y.cuda()
+            x, y = x.cuda(), y.cuda()
 
             # Compute prediction error
-            y_pred = _model(x, P)
+            y_pred = _model(x)
             test_loss += _loss_fn(y_pred, y).item()
             if batch == 0:
                 save_prediction_sample(y_pred[0], y[0], x[0])
@@ -131,6 +131,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', action='store', default=4, type=int, required=False)
 
     args = parser.parse_args()
+    print(args)
 
     ######## hyper parameters #########
     lr = args.lr
@@ -156,7 +157,7 @@ if __name__ == '__main__':
     print(f"1.\tUsing device {torch.cuda.get_device_name()}")
 
     # 2. init model
-    m = UNetDualDecoder(last_activation='sigmoid').cuda()
+    m = UNet(in_channels=2, out_channels=2, last_activation='sigmoid').cuda()
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")
@@ -188,11 +189,11 @@ if __name__ == '__main__':
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
 
-        # log one image and test loss
-        test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
-
         # train
         train_one_epoch(train_loader, m, loss_fn, optimizer)
+
+        # log one image and test loss
+        test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
 
         # save model params
         torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")

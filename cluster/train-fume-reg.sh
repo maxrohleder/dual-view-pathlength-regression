@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-## Usage:  sbatch train-pl-reg.sh
+## Usage:  sbatch train-fume-reg.sh
 
 ############    slurm    ###############
 
@@ -54,7 +54,7 @@ echo "finished transfer at $(date)"
 
 # start training
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
-python train_dual_unet.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
+python train_fume_unet.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
 rm -rf $FAST_DATA_DIR

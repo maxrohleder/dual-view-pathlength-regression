@@ -50,7 +50,7 @@ class UpBlock(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels, out_channels, up_sample_mode='conv_transpose'):
+    def __init__(self, in_channels, out_channels, last_activation='relu', up_sample_mode='conv_transpose'):
         super(UNet, self).__init__()
         self.up_sample_mode = up_sample_mode
         # Downsampling Path
@@ -74,6 +74,19 @@ class UNet(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
+        # Final Convolution
+        if last_activation == 'relu':
+            self.conv_last = nn.Sequential(
+                nn.Conv2d(64, out_channels, kernel_size=1),
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU(inplace=True)
+            )
+        if last_activation == 'sigmoid':
+            self.conv_last = nn.Sequential(
+                nn.Conv2d(64, out_channels, kernel_size=1),
+                nn.BatchNorm2d(out_channels),
+                nn.Sigmoid()
+            )
 
     def forward(self, x):
         x, skip1_out = self.down_conv1(x)
