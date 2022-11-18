@@ -14,22 +14,6 @@ from torch.utils.tensorboard import SummaryWriter
 def downsample(ten: torch.Tensor):
     return F.pad(ten[:, ::2, ::2], (12, 12, 12, 12), mode="reflect")
 
-
-class DiceLoss(nn.Module):
-    def __init__(self):
-        super(DiceLoss, self).__init__()
-
-    def forward(self, inputs, targets, smooth=1):
-        # flatten label and prediction tensors
-        inputs = inputs.view(-1)
-        targets = targets.view(-1)
-
-        intersection = (inputs * targets).sum()
-        dice = (2. * intersection + smooth) / (inputs.sum() + targets.sum() + smooth)
-
-        return 1 - dice
-
-
 def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
     nbatches = len(_loader)
@@ -48,12 +32,12 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
         loss.backward()
         _optimizer.step()
         avg_loss += loss.item()
-        writer.add_scalar("loss/train", avg_loss, global_step=e * size + (batch + 1) * _loader.batch_size)
 
         # every 10% of dataset, print info
         if batch % (nbatches // 10) == 0:
+            writer.add_scalar("loss/train", loss, global_step=e * size + (batch + 1) * _loader.batch_size)
             current = batch * _loader.batch_size
-            print(f"{datetime.now()}:   avg loss: {avg_loss / (nbatches // 400):>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"{datetime.now()}:   avg loss: {avg_loss:>7f}  [{current:>5d}/{size:>5d}]")
             avg_loss = 0
 
 
@@ -157,19 +141,19 @@ if __name__ == '__main__':
     print(f"1.\tUsing device {torch.cuda.get_device_name()}")
 
     # 2. init model
-    m = UNet(in_channels=2, out_channels=2, last_activation='sigmoid').cuda()
+    m = UNet(in_channels=2, out_channels=2, last_activation='relu').cuda()
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")
     print(f"\t\t- allocated {np.round(torch.cuda.memory_allocated(device='cuda') / 1e6, decimals=2)} Mb")
 
     # 3. define loss and optimizer
-    loss_fn = DiceLoss()
+    loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(m.parameters(), lr=lr)
 
     # 3. init dataloader
-    train_data = NPZData(train_data_dir, downsample=2, pad=12, binarize=True, noise=True)  # convert data to (512, 512)
-    test_data = NPZData(test_data_dir, downsample=2, pad=12, binarize=True, noise=True)
+    train_data = NPZData(train_data_dir, downsample=2, pad=12, noise=True)
+    test_data = NPZData(test_data_dir, downsample=2, pad=12, noise=True)
     nsamples = len(train_data)
     train_loader = DataLoader(train_data,
                               batch_size=bs,
@@ -177,7 +161,7 @@ if __name__ == '__main__':
                               shuffle=True,
                               num_workers=workers)
     test_loader = DataLoader(test_data,
-                             batch_size=bs*2,  # more is possible here bc activations need not be stored
+                             batch_size=bs,
                              pin_memory=True,  # needed for CUDA multiprocessing
                              shuffle=False,
                              num_workers=workers)
