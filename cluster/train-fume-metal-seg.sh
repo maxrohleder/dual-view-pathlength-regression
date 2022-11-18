@@ -1,22 +1,18 @@
 #!/bin/bash -l
 
-## Usage:  sbatch train-pl-reg.sh
-
 ############    slurm    ###############
 
-#SBATCH --job-name=pl-reg
+#SBATCH --job-name=fume-seg
 #SBATCH --time=24:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
 
 ############    paths    ###############
 
-#DATA_DIR=$HPCVAULT/datadump
 DATA_ARCHIVE=$HPCVAULT/pl-reg/archive.tar
-FAST_DATA_DIR=$TMPDIR/pl-reg-data-$SLURM_JOB_ID
+FAST_DATA_DIR=$TMPDIR/fume-seg-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
-RESULTS_DIR=$HOME/pl-reg-run-$SLURM_JOB_ID
-EXAMPLE=$DATA_DIR/Spine02_0_180_id0.npz
+RESULTS_DIR=$HOME/fume-seg-$SLURM_JOB_ID
 
 ############    params   ###############
 
@@ -54,7 +50,7 @@ echo "finished transfer at $(date)"
 
 # start training
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
-python train_dual_unet.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
+python train_dual_unet_segmentation.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
 rm -rf $FAST_DATA_DIR

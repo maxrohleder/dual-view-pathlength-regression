@@ -50,8 +50,11 @@ class UpBlock(nn.Module):
 
 
 class UNetDualDecoder(nn.Module):
-    def __init__(self, up_sample_mode='conv_transpose'):
+    def __init__(self, last_activation='relu', up_sample_mode='conv_transpose'):
         super(UNetDualDecoder, self).__init__()
+
+        assert last_activation in ['relu', 'sigmoid'], f"{last_activation} is not a supported activation function"
+
         self.up_sample_mode = up_sample_mode
         self.fume = Fume3dLayer()
         self.f2 = torch.tensor(2, dtype=torch.float32, device='cuda', requires_grad=False)
@@ -74,12 +77,18 @@ class UNetDualDecoder(nn.Module):
         self.up_conv1 = UpBlock(64 + 128 + 128, 64, self.up_sample_mode)
 
         # Final Convolution
-        self.conv_last = nn.Sequential(
-            nn.Conv2d(64, 1, kernel_size=1),
-            nn.BatchNorm2d(1),
-            nn.ReLU(inplace=True)
-        )
-
+        if last_activation == 'relu':
+            self.conv_last = nn.Sequential(
+                nn.Conv2d(64, 1, kernel_size=1),
+                nn.BatchNorm2d(1),
+                nn.ReLU(inplace=True)
+            )
+        if last_activation == 'sigmoid':
+            self.conv_last = nn.Sequential(
+                nn.Conv2d(64, 1, kernel_size=1),
+                nn.BatchNorm2d(1),
+                nn.Sigmoid()
+            )
         # debug
         self.down_sample = nn.MaxPool2d(2)
         self.up_sample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)

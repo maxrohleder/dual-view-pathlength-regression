@@ -35,10 +35,10 @@ def neglog(intensities):
 
 
 class NPZData(Dataset):
-    def __init__(self, path, downsample=1, pad=0, normalize=True, neglog=False):
+    def __init__(self, path, downsample=1, pad=0, binarize=False, noise=False):
         self.path = path
         self.files = sorted(list(Path(path).glob('*.npz')))
-        self.downsample, self.pad = downsample, pad
+        self.downsample, self.pad, self.binarize, self.noise = downsample, pad, binarize, noise
 
         # calculate how to adapt the projection matrices
         centered = np.eye(3)
@@ -53,14 +53,20 @@ class NPZData(Dataset):
         return len(self.files)
 
     def __getitem__(self, item):
+        # x are normalized intensities in range (0, 1)
         sample = np.load(str(self.files[item]))
+        x, y = sample['x'], sample['y']
 
-        # adding noise
-        x = add_noise(sample['x'])
+        # adding noise to input images
+        if self.noise:
+            x = add_noise(sample['x'])
+
+        if self.binarize:
+            y[y > 0] = 1
 
         # images need to be transposed for fume layers
         x_tensor = torch.from_numpy(np.transpose(x, axes=(0, 2, 1)))
-        y_tensor = torch.from_numpy(np.transpose(sample['y'], axes=(0, 2, 1)))
+        y_tensor = torch.from_numpy(np.transpose(y, axes=(0, 2, 1)))
 
         # normalize
         x_tensor = Normalize(torch.mean(x_tensor, dim=(1, 2)), torch.std(x_tensor, dim=(1, 2)), inplace=True)(x_tensor)
