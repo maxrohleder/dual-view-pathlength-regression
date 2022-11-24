@@ -34,27 +34,27 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
     nbatches = len(_loader)
     _model.train()
-    avg_loss = 0
-    for batch, (x, _, y) in enumerate(_loader):
+    avg_loss = []
+    for batch, (x, P, y) in enumerate(_loader):
         # copy to gpu
-        x, y = x.cuda(), y.cuda()
+        x, P, y = x.cuda(), P.cuda(), y.cuda()
 
         # Compute prediction error
-        y_pred = _model(x)
+        y_pred = _model(x, P)
         loss = _loss_fn(y_pred, y)
 
         # Backpropagation
         _optimizer.zero_grad()
         loss.backward()
         _optimizer.step()
-        avg_loss += loss.item()
-        writer.add_scalar("loss/train", avg_loss, global_step=e * size + (batch + 1) * _loader.batch_size)
+        avg_loss.append(loss.item())
+        writer.add_scalar("loss/train", np.mean(avg_loss), global_step=e * size + (batch + 1) * _loader.batch_size)
 
         # every 10% of dataset, print info
         if batch % (nbatches // 10) == 0:
             current = batch * _loader.batch_size
-            print(f"{datetime.now()}:   avg loss: {avg_loss / (nbatches // 400):>7f}  [{current:>5d}/{size:>5d}]")
-            avg_loss = 0
+            print(f"{datetime.now()}:   avg loss: {np.mean(avg_loss):>7f}  [{current:>5d}/{size:>5d}]")
+            avg_loss = []
 
 
 def evaluate(_loader, _model, _loss_fn):
@@ -64,12 +64,12 @@ def evaluate(_loader, _model, _loss_fn):
     test_loss = 0
     print(f"{datetime.now()}:   evaluation...")
     with torch.no_grad():
-        for batch, (x, _, y) in enumerate(_loader):
+        for batch, (x, P, y) in enumerate(_loader):
             # copy to gpu
-            x, y = x.cuda(), y.cuda()
+            x, P, y = x.cuda(), P.cuda(), y.cuda()
 
             # Compute prediction error
-            y_pred = _model(x)
+            y_pred = _model(x, P)
             test_loss += _loss_fn(y_pred, y).item()
             if batch == 0:
                 save_prediction_sample(y_pred[0], y[0], x[0])

@@ -18,7 +18,7 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     size = len(_loader.dataset)
     nbatches = len(_loader)
     _model.train()
-    avg_loss = 0
+    avg_loss = []
     for batch, (x, P, y) in enumerate(_loader):
         # copy to gpu
         x, P, y = x.cuda(), P.cuda(), y.cuda()
@@ -31,14 +31,14 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
         _optimizer.zero_grad()
         loss.backward()
         _optimizer.step()
-        avg_loss += loss.item()
+        avg_loss.append(loss.item())
+        writer.add_scalar("loss/train", np.mean(avg_loss), global_step=e * size + (batch + 1) * _loader.batch_size)
 
         # every 10% of dataset, print info
         if batch % (nbatches // 10) == 0:
-            writer.add_scalar("loss/train", loss, global_step=e * size + (batch + 1) * _loader.batch_size)
             current = batch * _loader.batch_size
-            print(f"{datetime.now()}:   avg loss: {avg_loss:>7f}  [{current:>5d}/{size:>5d}]")
-            avg_loss = 0
+            print(f"{datetime.now()}:   avg loss: {np.mean(avg_loss):>7f}  [{current:>5d}/{size:>5d}]")
+            avg_loss = []
 
 
 def evaluate(_loader, _model, _loss_fn):
@@ -108,8 +108,8 @@ if __name__ == '__main__':
     parser.add_argument('--data', action='store', type=Path, required=True)
     parser.add_argument('--testdata', action='store', type=Path, required=True)
     parser.add_argument('--results', action='store', type=Path, required=True)
-    parser.add_argument('--example', action='store', type=Path, required=True)
 
+    parser.add_argument('--checkpoint', action='store', default=None, type=Path, required=False)
     parser.add_argument('--epochs', action='store', default=100, type=int, required=False)
     parser.add_argument('--bs', action='store', default=1, type=int, required=False)
     parser.add_argument('--lr', action='store', default=1e-3, type=float, required=False)
@@ -142,7 +142,13 @@ if __name__ == '__main__':
     print(f"1.\tUsing device {torch.cuda.get_device_name()}")
 
     # 2. init model
-    m = UNetDualDecoder().cuda()
+    m = UNetDualDecoder()
+    if args.checkpoint is not None:
+        print(f"2. Resuming training from {args.checkpoint}")
+        m.load_state_dict(torch.load(args.checkpoint))
+    m.cuda()
+
+    # 2.1 print model stats
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f"2.\tInitialized model with {np.round(params / 1e6, decimals=2)} mio. params")

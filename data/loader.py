@@ -35,10 +35,10 @@ def neglog(intensities):
 
 
 class NPZData(Dataset):
-    def __init__(self, path, downsample=1, pad=0, binarize=False, noise=False):
+    def __init__(self, path, downsample=1, pad=0, binarize=False, noise=False, eval=False):
         self.path = path
         self.files = sorted(list(Path(path).glob('*.npz')))
-        self.downsample, self.pad, self.binarize, self.noise = downsample, pad, binarize, noise
+        self.downsample, self.pad, self.binarize, self.noise, self.eval = downsample, pad, binarize, noise, eval
 
         # calculate how to adapt the projection matrices
         centered = np.eye(3)
@@ -85,4 +85,7 @@ class NPZData(Dataset):
         F21 = calculate_fundamental_matrix(P_src=P2, P_dst=P1)
         P_tensor = torch.tensor(np.array([F12, F21]), dtype=torch.float32)
 
-        return x_tensor, P_tensor, y_tensor
+        if not self.eval:
+            return x_tensor, P_tensor, y_tensor
+        else:
+            return x_tensor, P_tensor, y_tensor, str(self.files[item])
