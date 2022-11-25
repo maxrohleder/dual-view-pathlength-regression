@@ -122,7 +122,6 @@ if __name__ == '__main__':
     bs = args.bs
     workers = args.workers
     epochs = args.epochs
-    example = args.example
 
     train_data_dir = args.data
     test_data_dir = args.testdata

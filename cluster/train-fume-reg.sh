@@ -16,13 +16,12 @@ DATA_ARCHIVE=$HPCVAULT/pl-reg/archive.tar
 FAST_DATA_DIR=$TMPDIR/pl-reg-data-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
 RESULTS_DIR=$HOME/fume-reg-$SLURM_JOB_ID
-EXAMPLE=$DATA_DIR/Spine02_0_180_id0.npz
 
 ############    params   ###############
 
 EPOCHS=100
 BS=4
-LR=0.001
+LR=0.0001
 WORKERS=4
 
 # allows for internet connection on cluster nodes
@@ -52,9 +51,13 @@ mkdir $FAST_DATA_DIR
 tar -xf $DATA_ARCHIVE -C $FAST_DATA_DIR
 echo "finished transfer at $(date)"
 
-# start training
+# change to src
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
-python train_fume_regression.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --example $EXAMPLE --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
+echo "Using Repository Revision"
+git log --oneline -n 1
+
+# start training
+python train_fume_regression.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
 rm -rf $FAST_DATA_DIR
