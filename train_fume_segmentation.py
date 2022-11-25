@@ -47,7 +47,7 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
         _optimizer.zero_grad()
         loss.backward()
         _optimizer.step()
-        avg_loss.append(loss.item())
+        avg_loss.append(float(loss.item()))
         writer.add_scalar("loss/train", np.mean(avg_loss), global_step=e * size + (batch + 1) * _loader.batch_size)
 
         # every 10% of dataset, print info
@@ -176,7 +176,7 @@ if __name__ == '__main__':
                               shuffle=True,
                               num_workers=workers)
     test_loader = DataLoader(test_data,
-                             batch_size=bs*2,  # more is possible here bc activations need not be stored
+                             batch_size=bs,
                              pin_memory=True,  # needed for CUDA multiprocessing
                              shuffle=False,
                              num_workers=workers)
@@ -188,11 +188,11 @@ if __name__ == '__main__':
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
 
-        # log one image and test loss
-        test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
-
         # train
         train_one_epoch(train_loader, m, loss_fn, optimizer)
+
+        # log one image and test loss
+        test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
 
         # save model params
         torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")

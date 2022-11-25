@@ -18,8 +18,11 @@ RESULTS_DIR=$HOME/fume-seg-$SLURM_JOB_ID
 
 EPOCHS=100
 BS=4
-LR=0.001
+LR=0.0001
 WORKERS=4
+
+# print learning rate
+echo "Using lr = $LR"
 
 # allows for internet connection on cluster nodes
 export http_proxy=http://proxy:80
@@ -48,8 +51,12 @@ mkdir $FAST_DATA_DIR
 tar -xf $DATA_ARCHIVE -C $FAST_DATA_DIR
 echo "finished transfer at $(date)"
 
-# start training
+# change to src
 cd $SRC_DIR || echo "could not cd into $SRC_DIR"
+echo "Using Repository Revision"
+git log --oneline -n 1
+
+# start training
 python train_fume_segmentation.py --data $FAST_DATA_DIR/RandomPreprocessed --testdata $FAST_DATA_DIR/ManualPreprocessed --results $RESULTS_DIR --epochs $EPOCHS --bs $BS --lr $LR --workers $WORKERS
 
 # cleanup
