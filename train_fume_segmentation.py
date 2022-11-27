@@ -58,7 +58,6 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
 
 
 def evaluate(_loader, _model, _loss_fn):
-    print()
     num_batches = len(_loader)
     _model.eval()
     test_loss = 0
@@ -184,6 +183,7 @@ if __name__ == '__main__':
 
     # 4. train & save
     test_loss = -1.00
+    min_test_los = 100.
     niter = len(train_data)  # number of iterations per epoch
     for e in range(epochs):
         print(f"Epoch {e + 1}\n-------------------------------")
@@ -195,5 +195,7 @@ if __name__ == '__main__':
         test_loss = evaluate(_loader=test_loader, _loss_fn=loss_fn, _model=m)
 
         # save model params
-        torch.save(m.state_dict(), checkpoint_dir / f"model_{e}.pth")
-        print(f"Saved Model State to {checkpoint_dir / f'model_{e}.pth'}")
+        if test_loss < min_test_los:
+            torch.save(m.state_dict(), checkpoint_dir / f"model_{e}_val_dice_{test_loss:.4f}.pth")
+            print(f"Saved Model State to {checkpoint_dir / f'model_{e}.pth'}")
+            min_test_los = test_loss
