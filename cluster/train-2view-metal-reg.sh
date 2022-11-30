@@ -18,7 +18,7 @@ RESULTS_DIR=$HOME/dual-view-reg-$SLURM_JOB_ID
 
 EPOCHS=100
 BS=8
-LR=0.001
+LR=0.0001
 WORKERS=4
 
 # allows for internet connection on cluster nodes
