@@ -9,7 +9,7 @@
 
 ############    paths    ###############
 
-DATA_ARCHIVE=$HPCVAULT/pl-reg/archive-single.tar
+DATA_ARCHIVE=$HPCVAULT/pl-reg-single-view/archive-single.tar
 FAST_DATA_DIR=$TMPDIR/dual-view-seg-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
 RESULTS_DIR=$HOME/dual-view-seg-$SLURM_JOB_ID
