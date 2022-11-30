@@ -80,7 +80,7 @@ def do_eval(_model, _loader, out_dir: Path, needs_p=True, mode='seg'):
 
 
 if __name__ == '__main__':
-    out_dir = Path("/media/dl/dataFeb22/results/evaluation")
+    out_dir = Path("/media/dl/dataFeb22/results/evaluation/Nov30")
     test_data_dir = Path("/media/dl/data2/pathlength-reg/datadump/ManualPreprocessed")
     test_data = NPZData(test_data_dir, downsample=2, pad=12, noise=False, binarize=True, eval=True)
     test_loader = DataLoader(test_data,
@@ -89,38 +89,38 @@ if __name__ == '__main__':
                              shuffle=False,
                              num_workers=4)
     # model checkpoints
-    fume_seg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/iwi5106h/fume-seg-520231/checkpoints/model_99.pth")
+    fume_seg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/Nov30/fume-seg-522292/checkpoints/model_99.pth")
     fume_reg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/iwi5106h/fume-reg-520145/checkpoints/model_99.pth")
-    dual_view_seg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/iwi5106h/dual-view-seg-520235/checkpoints/model_99.pth")
+    dual_view_seg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/Nov30/dual-view-seg-522916/checkpoints/model_97_val_dice_0.0675.pth")
     dual_view_reg_checkpoint = Path("/media/dl/dataFeb22/results/FUME/iwi5106h/dual-view-reg-520236/checkpoints/model_99.pth")
 
     # load segmentation model with fume layers
-    # model = UNetDualDecoder(last_activation='sigmoid')
-    # model.load_state_dict(torch.load(fume_seg_checkpoint))
-    # model.eval()
-    # model.cuda()
-    # do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "fume_seg", needs_p=True, mode='seg')
+    model = UNetDualDecoder(last_activation='sigmoid')
+    model.load_state_dict(torch.load(fume_seg_checkpoint))
+    model.eval()
+    model.cuda()
+    do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "fume_seg", needs_p=True, mode='seg')
 
     # load segmentation model
-    # model = UNet(in_channels=2, out_channels=2, last_activation='sigmoid')
-    # model.load_state_dict(torch.load(dual_view_seg_checkpoint))
-    # model.eval()
-    # model.cuda()
-    # do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "dual_view_seg", needs_p=False, mode='seg')
+    model = UNet(in_channels=2, out_channels=2, last_activation='sigmoid')
+    model.load_state_dict(torch.load(dual_view_seg_checkpoint))
+    model.eval()
+    model.cuda()
+    do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "dual_view_seg", needs_p=False, mode='seg')
 
     # load regression model with fume layers
-    model = UNetDualDecoder(last_activation='relu')
-    model.load_state_dict(torch.load(fume_reg_checkpoint))
-    model.eval()
-    model.cuda()
-    do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "fume_reg", needs_p=True, mode='reg')
+    # model = UNetDualDecoder(last_activation='relu')
+    # model.load_state_dict(torch.load(fume_reg_checkpoint))
+    # model.eval()
+    # model.cuda()
+    # do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "fume_reg", needs_p=True, mode='reg')
 
     # load segmentation model
-    model = UNet(in_channels=2, out_channels=2, last_activation='relu')
-    model.load_state_dict(torch.load(dual_view_reg_checkpoint))
-    model.eval()
-    model.cuda()
-    do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "dual_view_reg", needs_p=False, mode='reg')
+    # model = UNet(in_channels=2, out_channels=2, last_activation='relu')
+    # model.load_state_dict(torch.load(dual_view_reg_checkpoint))
+    # model.eval()
+    # model.cuda()
+    # do_eval(_model=model, _loader=test_loader, out_dir=out_dir / "dual_view_reg", needs_p=False, mode='reg')
 
 
 

@@ -5,7 +5,7 @@ from tifffile import imread, imsave
 from tqdm import trange, tqdm
 
 if __name__ == '__main__':
-    path = Path("/media/dl/data2/results/fume/FUME_seg_Nov25")
+    path = Path("/media/dl/data2/results/fume/UNet_seg_Nov30")
     outpath = path / "whole_scans"
     outpath.mkdir(exist_ok=True)
 

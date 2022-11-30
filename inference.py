@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # --data
     # /media/dl/data2/pathlength-reg/datadump/ManualPreprocessed
     # --dst
-    # /media/dl/data2/results/fume/FUME_seg_Nov25
+    # /media/dl/data2/results/fume/FUME_seg_Nov30
     # --model
     # UNet_fume_seg
     # --checkpoint
@@ -56,11 +56,11 @@ if __name__ == '__main__':
     # --data
     # /media/dl/data2/pathlength-reg/datadump/ManualPreprocessed
     # --dst
-    # /media/dl/data2/results/fume/UNet_reg_Nov25
+    # /media/dl/data2/results/fume/UNet_seg_Nov30
     # --model
-    # UNet_reg
+    # UNet_seg
     # --checkpoint
-    # /media/dl/dataFeb22/results/FUME/iwi5106h/dual-view-reg-520236/checkpoints/model_99.pth
+    # /media/dl/dataFeb22/results/FUME/Nov30/dual-view-seg-522916/checkpoints/model_97_val_dice_0.0675.pth
 
     args = parser.parse_args()
 

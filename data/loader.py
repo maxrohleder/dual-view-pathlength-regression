@@ -89,3 +89,45 @@ class NPZData(Dataset):
             return x_tensor, P_tensor, y_tensor
         else:
             return x_tensor, P_tensor, y_tensor, str(self.files[item])
+
+class NPZData_single_view(Dataset):
+    def __init__(self, path, downsample=1, pad=0, binarize=False, noise=False, eval=False):
+        self.path = path
+        self.files = sorted(list(Path(path).glob('*.npz')))
+        self.downsample, self.pad, self.binarize, self.noise, self.eval = downsample, pad, binarize, noise, eval
+
+    def __len__(self):
+        return len(self.files)
+
+    def __getitem__(self, item):
+        # x are normalized intensities in range (0, 1)
+        sample = np.load(str(self.files[item]))
+        x, y = sample['x'], sample['y']
+
+        if x.ndim == 2:
+            x = np.reshape(x, (1, *x.shape))
+            y = np.reshape(y, (1, *y.shape))
+
+        # adding noise to input images
+        if self.noise:
+            x = add_noise(x)
+
+        if self.binarize:
+            y[y > 0] = 1
+
+        # images need to be transposed for fume layers
+        x_tensor = torch.from_numpy(x)
+        y_tensor = torch.from_numpy(y)
+
+        # normalize
+        x_tensor = Normalize(torch.mean(x_tensor, dim=(1, 2)), torch.std(x_tensor, dim=(1, 2)), inplace=True)(x_tensor)
+
+        # downsample and augment etc.
+        if self.downsample != 1 or self.pad != 0:
+            x_tensor = downsample_tensor(x_tensor, self.downsample, self.pad)
+            y_tensor = downsample_tensor(y_tensor, self.downsample, self.pad)
+
+        if not self.eval:
+            return x_tensor, y_tensor
+        else:
+            return x_tensor, y_tensor, str(self.files[item])
