@@ -2,7 +2,7 @@
 
 ############    slurm    ###############
 
-#SBATCH --job-name=sinlge-seg
+#SBATCH --job-name=single-seg
 #SBATCH --time=24:00:00
 #SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
@@ -10,14 +10,14 @@
 ############    paths    ###############
 
 DATA_ARCHIVE=$HPCVAULT/pl-reg-single-view/archive-single.tar
-FAST_DATA_DIR=$TMPDIR/dual-view-seg-$SLURM_JOB_ID
+FAST_DATA_DIR=$TMPDIR/single-view-seg-$SLURM_JOB_ID
 SRC_DIR=$HOME/dual-view-pathlength-regression
-RESULTS_DIR=$HOME/dual-view-seg-$SLURM_JOB_ID
+RESULTS_DIR=$HOME/single-view-seg-$SLURM_JOB_ID
 
 ############    params   ###############
 
-EPOCHS=100
-BS=8
+EPOCHS=200
+BS=14
 LR=0.001
 WORKERS=4
 
