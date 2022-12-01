@@ -35,12 +35,12 @@ def train_one_epoch(_loader, _model, _loss_fn, _optimizer):
     nbatches = len(_loader)
     _model.train()
     avg_loss = []
-    for batch, (x, P, y) in enumerate(_loader):
+    for batch, (x, y) in enumerate(_loader):
         # copy to gpu
-        x, P, y = x.cuda(), P.cuda(), y.cuda()
+        x, y = x.cuda(), y.cuda()
 
         # Compute prediction error
-        y_pred = _model(x, P)
+        y_pred = _model(x)
         loss = _loss_fn(y_pred, y)
 
         # Backpropagation
